@@ -2,7 +2,6 @@ import express from 'express';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { initializeDatabase } from './models/index';
-import { logCookieSecurityStatus } from './auth/cookieSecurity';
 import userRoutes from './routes/userRoutes';
 import connectionRoutes from './routes/connectionRoutes';
 import postRoutes from './routes/postRoutes';
@@ -16,6 +15,15 @@ const port = 3000;
 
 app.use(express.json());
 app.use(cookieParser());
+
+// Security headers for production
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    next();
+});
 
 app.use((req, res, next) => {
     const timestamp = new Date().toISOString();
@@ -41,13 +49,8 @@ async function startServer() {
         }
 
         app.listen(port, () => {
-            console.log('🚀 LinkedIn API Server Started with Sequelize!');
+            console.log('🚀 LinkedIn API Server Started!');
             console.log(`📍 Server running at http://localhost:${port}`);
-            console.log('🔧 Debugging enabled - All API calls will be logged');
-            console.log('📱 Ready for Postman testing!\n');
-            
- 
-            logCookieSecurityStatus();
         });
     } catch (error) {
         console.error('❌ Server startup failed:', error);
