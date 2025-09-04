@@ -2,6 +2,7 @@ import User from '../models/User';
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import { generateTokens, verifyRefreshToken } from '../auth/authUtils';
+import { getSecureRefreshTokenConfig } from '../auth/cookieSecurity';
 
 export async function addUser(req: Request, res: Response) {
     console.log('🔵 [USER] POST /api/users - Adding new user');
@@ -122,12 +123,8 @@ export async function loginUser(req: Request, res: Response) {
         
         console.log('🔐 [USER] JWT tokens generated successfully');
         
-        res.cookie('refreshToken', tokens.refreshToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 7 * 24 * 60 * 60 * 1000
-        });
+        const cookieConfig = getSecureRefreshTokenConfig(7 * 24 * 60 * 60 * 1000);
+        res.cookie('refreshToken', tokens.refreshToken, cookieConfig);
         
         console.log('🍪 [USER] Refresh token set in httpOnly cookie');
         
@@ -179,12 +176,8 @@ export async function refreshToken(req: Request, res: Response) {
         
         console.log('✅ [USER] New access token generated for user:', decoded.Email);
         
-        res.cookie('refreshToken', tokens.refreshToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 7 * 24 * 60 * 60 * 1000
-        });
+        const cookieConfig = getSecureRefreshTokenConfig(7 * 24 * 60 * 60 * 1000);
+        res.cookie('refreshToken', tokens.refreshToken, cookieConfig);
         
         res.status(200).json({
             message: 'Token refreshed successfully',
@@ -206,11 +199,8 @@ export async function refreshToken(req: Request, res: Response) {
 export async function logoutUser(req: Request, res: Response) {
     console.log('🔵 [USER] POST /api/users/logout - User logout');
     
-    res.clearCookie('refreshToken', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict'
-    });
+    const cookieConfig = getSecureRefreshTokenConfig();
+    res.clearCookie('refreshToken', cookieConfig);
     
     console.log('✅ [USER] User logged out - refresh token cleared');
     res.status(200).json({ message: 'Logged out successfully' });

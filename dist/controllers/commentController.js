@@ -22,7 +22,7 @@ function addComment(req, res) {
         console.log('🔵 [COMMENT] POST /api/comments - Adding comment to post');
         console.log('📝 Request body:', JSON.stringify(req.body, null, 2));
         const { PostID, Content, ReplyToID } = req.body;
-        const user = req.user; // From authenticateToken middleware
+        const user = req.user;
         if (!PostID || !Content) {
             console.log('❌ [COMMENT] Validation failed - Missing required fields');
             res.status(400).json({ error: 'Missing required fields: PostID, Content' });

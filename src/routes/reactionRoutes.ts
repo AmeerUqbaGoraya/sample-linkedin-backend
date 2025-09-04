@@ -6,6 +6,5 @@ const router = Router();
 
 router.post('/reactions', authenticateToken, addReaction);
 router.delete('/reactions', authenticateToken, removeReaction);
-router.get('/reactions', getReactionTypes); // Changed from /reaction-types to be consistent
-
+router.get('/reactions', getReactionTypes);
 export default router;

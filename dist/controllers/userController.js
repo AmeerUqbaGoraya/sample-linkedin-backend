@@ -20,6 +20,7 @@ exports.logoutUser = logoutUser;
 const User_1 = __importDefault(require("../models/User"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const authUtils_1 = require("../auth/authUtils");
+const cookieSecurity_1 = require("../auth/cookieSecurity");
 function addUser(req, res) {
     return __awaiter(this, void 0, void 0, function* () {
         console.log('🔵 [USER] POST /api/users - Adding new user');
@@ -126,12 +127,8 @@ function loginUser(req, res) {
                 UserRole: user.UserRole
             });
             console.log('🔐 [USER] JWT tokens generated successfully');
-            res.cookie('refreshToken', tokens.refreshToken, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'strict',
-                maxAge: 7 * 24 * 60 * 60 * 1000
-            });
+            const cookieConfig = (0, cookieSecurity_1.getSecureRefreshTokenConfig)(7 * 24 * 60 * 60 * 1000);
+            res.cookie('refreshToken', tokens.refreshToken, cookieConfig);
             console.log('🍪 [USER] Refresh token set in httpOnly cookie');
             res.status(200).json({
                 message: 'Login successful',
@@ -176,12 +173,8 @@ function refreshToken(req, res) {
                 UserRole: decoded.UserRole
             });
             console.log('✅ [USER] New access token generated for user:', decoded.Email);
-            res.cookie('refreshToken', tokens.refreshToken, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'strict',
-                maxAge: 7 * 24 * 60 * 60 * 1000
-            });
+            const cookieConfig = (0, cookieSecurity_1.getSecureRefreshTokenConfig)(7 * 24 * 60 * 60 * 1000);
+            res.cookie('refreshToken', tokens.refreshToken, cookieConfig);
             res.status(200).json({
                 message: 'Token refreshed successfully',
                 accessToken: tokens.accessToken,
@@ -203,11 +196,8 @@ function refreshToken(req, res) {
 function logoutUser(req, res) {
     return __awaiter(this, void 0, void 0, function* () {
         console.log('🔵 [USER] POST /api/users/logout - User logout');
-        res.clearCookie('refreshToken', {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict'
-        });
+        const cookieConfig = (0, cookieSecurity_1.getSecureRefreshTokenConfig)();
+        res.clearCookie('refreshToken', cookieConfig);
         console.log('✅ [USER] User logged out - refresh token cleared');
         res.status(200).json({ message: 'Logged out successfully' });
     });

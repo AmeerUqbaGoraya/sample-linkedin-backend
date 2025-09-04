@@ -16,6 +16,7 @@ const express_1 = __importDefault(require("express"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const index_1 = require("./models/index");
+const cookieSecurity_1 = require("./auth/cookieSecurity");
 const userRoutes_1 = __importDefault(require("./routes/userRoutes"));
 const connectionRoutes_1 = __importDefault(require("./routes/connectionRoutes"));
 const postRoutes_1 = __importDefault(require("./routes/postRoutes"));
@@ -52,6 +53,8 @@ function startServer() {
                 console.log(`📍 Server running at http://localhost:${port}`);
                 console.log('🔧 Debugging enabled - All API calls will be logged');
                 console.log('📱 Ready for Postman testing!\n');
+                // Log cookie security status
+                (0, cookieSecurity_1.logCookieSecurityStatus)();
             });
         }
         catch (error) {

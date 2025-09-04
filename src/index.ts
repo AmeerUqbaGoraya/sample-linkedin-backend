@@ -2,6 +2,7 @@ import express from 'express';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { initializeDatabase } from './models/index';
+import { logCookieSecurityStatus } from './auth/cookieSecurity';
 import userRoutes from './routes/userRoutes';
 import connectionRoutes from './routes/connectionRoutes';
 import postRoutes from './routes/postRoutes';
@@ -44,6 +45,9 @@ async function startServer() {
             console.log(`📍 Server running at http://localhost:${port}`);
             console.log('🔧 Debugging enabled - All API calls will be logged');
             console.log('📱 Ready for Postman testing!\n');
+            
+ 
+            logCookieSecurityStatus();
         });
     } catch (error) {
         console.error('❌ Server startup failed:', error);

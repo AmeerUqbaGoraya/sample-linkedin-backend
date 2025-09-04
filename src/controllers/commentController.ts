@@ -7,7 +7,7 @@ export async function addComment(req: Request, res: Response) {
     console.log('📝 Request body:', JSON.stringify(req.body, null, 2));
     
     const { PostID, Content, ReplyToID } = req.body;
-    const user = (req as any).user; // From authenticateToken middleware
+    const user = (req as any).user; 
     
     if (!PostID || !Content) {
         console.log('❌ [COMMENT] Validation failed - Missing required fields');

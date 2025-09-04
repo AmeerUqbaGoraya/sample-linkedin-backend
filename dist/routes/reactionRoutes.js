@@ -6,6 +6,6 @@ const authUtils_1 = require("../auth/authUtils");
 const router = (0, express_1.Router)();
 router.post('/reactions', authUtils_1.authenticateToken, reactionController_1.addReaction);
 router.delete('/reactions', authUtils_1.authenticateToken, reactionController_1.removeReaction);
-router.get('/reactions', reactionController_1.getReactionTypes); // Changed from /reaction-types to be consistent
+router.get('/reactions', reactionController_1.getReactionTypes);
 exports.default = router;
 //# sourceMappingURL=reactionRoutes.js.map
