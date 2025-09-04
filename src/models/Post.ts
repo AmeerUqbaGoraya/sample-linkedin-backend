@@ -5,7 +5,7 @@ import User from './User';
 interface PostAttributes {
     PostID: number;
     UserID: number;
-    PostType: 'Text' | 'Image' | 'Video' | 'Article';
+    PostType: 'Text' | 'Image' | 'Video' | 'Article' | 'Mixed';
     Content: string;
     CreatedAt?: Date;
 }
@@ -15,7 +15,7 @@ interface PostCreationAttributes extends Optional<PostAttributes, 'PostID' | 'Cr
 class Post extends Model<PostAttributes, PostCreationAttributes> implements PostAttributes {
     public PostID!: number;
     public UserID!: number;
-    public PostType!: 'Text' | 'Image' | 'Video' | 'Article';
+    public PostType!: 'Text' | 'Image' | 'Video' | 'Article' | 'Mixed';
     public Content!: string;
     public CreatedAt!: Date;
 }
@@ -36,7 +36,7 @@ Post.init(
             },
         },
         PostType: {
-            type: DataTypes.ENUM('Text', 'Image', 'Video', 'Article'),
+            type: DataTypes.ENUM('Text', 'Image', 'Video', 'Article', 'Mixed'),
             allowNull: false,
         },
         Content: {
@@ -55,8 +55,15 @@ Post.init(
     }
 );
 
+// Import PostMedia after Post is defined to avoid circular dependency
+import PostMedia from './PostMedia';
+
 // Define associations
 Post.belongsTo(User, { foreignKey: 'UserID', as: 'author' });
 User.hasMany(Post, { foreignKey: 'UserID', as: 'posts' });
+
+// Post-PostMedia associations
+Post.hasMany(PostMedia, { foreignKey: 'PostID', as: 'media' });
+PostMedia.belongsTo(Post, { foreignKey: 'PostID', as: 'post' });
 
 export default Post;

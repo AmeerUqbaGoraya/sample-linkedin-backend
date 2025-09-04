@@ -5,6 +5,7 @@ import Comment from './Comment';
 import Connection from './Connection';
 import Reaction from './Reaction';
 import PostReaction from './PostReaction';
+import PostMedia from './PostMedia';
 
 // Import all models to ensure associations are set up
 const models = {
@@ -14,6 +15,7 @@ const models = {
     Connection,
     Reaction,
     PostReaction,
+    PostMedia,
 };
 
 export const initializeDatabase = async () => {

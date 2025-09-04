@@ -1,17 +1,19 @@
 import Post from '../models/Post';
+import PostMedia from '../models/PostMedia';
 import User from '../models/User';
+import sequelize from '../models/database';
 import { Request, Response } from 'express';
 
 export async function createPost(req: Request, res: Response) {
     console.log('🔵 [POST] POST /api/posts - Creating new post');
     console.log('📝 Request body:', JSON.stringify(req.body, null, 2));
     
-    const { PostType, Content } = req.body;
+    const { PostType, Content, MediaURLs } = req.body;
     const user = (req as any).user; // From authenticateToken middleware
     
-    if (!PostType || !Content) {
+    if (!PostType || (!Content && !MediaURLs)) {
         console.log('❌ [POST] Validation failed - Missing required fields');
-        res.status(400).json({ error: 'Missing required fields: PostType, Content' });
+        res.status(400).json({ error: 'Missing required fields: PostType and either Content or MediaURLs' });
         return;
     }
     
@@ -23,14 +25,37 @@ export async function createPost(req: Request, res: Response) {
     
     try {
         console.log('💾 [POST] Creating post with Sequelize for PostType:', PostType);
+        
+        // Determine the actual PostType based on content
+        let actualPostType = PostType;
+        if (Content && MediaURLs && MediaURLs.length > 0) {
+            actualPostType = 'Mixed';
+        }
+        
         const newPost = await Post.create({
             UserID: user.UserID,
-            PostType: PostType as 'Text' | 'Image' | 'Video' | 'Article',
-            Content
+            PostType: actualPostType as 'Text' | 'Image' | 'Video' | 'Article' | 'Mixed',
+            Content: Content || ''
         });
         
+        // If there are media URLs, create PostMedia entries
+        if (MediaURLs && Array.isArray(MediaURLs) && MediaURLs.length > 0) {
+            console.log('💾 [POST] Creating media entries for post:', newPost.PostID);
+            const mediaPromises = MediaURLs.map((media: any, index: number) => {
+                return PostMedia.create({
+                    PostID: newPost.PostID,
+                    MediaType: media.type || 'Image',
+                    MediaURL: media.url,
+                    MediaOrder: index + 1
+                });
+            });
+            
+            await Promise.all(mediaPromises);
+            console.log('✅ [POST] Media entries created for post:', newPost.PostID);
+        }
+        
         console.log('✅ [POST] Post created successfully:', newPost.PostID);
-        console.log('🎉 [POST] New post added - UserID:', user.UserID, 'PostType:', PostType);
+        console.log('🎉 [POST] New post added - UserID:', user.UserID, 'PostType:', actualPostType);
         res.status(201).json({ 
             message: 'Post created',
             post: newPost
@@ -43,47 +68,80 @@ export async function createPost(req: Request, res: Response) {
 
 export async function getAllPosts(req: Request, res: Response) {
     console.log('🔵 [POST] GET /api/posts - Fetching all posts');
+    console.log('🚨 [DEBUG] getAllPosts function called!');
     
     try {
-        console.log('💾 [POST] Fetching all posts with user info using Sequelize...');
-        const posts = await Post.findAll({
-            include: [
-                {
-                    model: User,
-                    as: 'author',
-                    attributes: ['UserID', 'UserName', 'Email']
-                }
-            ],
-            order: [['CreatedAt', 'DESC']]
-        });
+        console.log('💾 [POST] Fetching all posts with user info and media using raw SQL...');
+        
+        // Use raw SQL query to ensure we get the media data
+        const [posts] = await sequelize.query(`
+            SELECT 
+                p.PostID,
+                p.UserID,
+                p.PostType,
+                p.Content,
+                p.CreatedAt,
+                u.UserName,
+                u.Email,
+                GROUP_CONCAT(
+                    CASE WHEN pm.MediaID IS NOT NULL 
+                    THEN JSON_OBJECT(
+                        'mediaId', pm.MediaID,
+                        'type', pm.MediaType,
+                        'url', pm.MediaURL,
+                        'order', pm.MediaOrder
+                    ) END
+                    ORDER BY pm.MediaOrder
+                    SEPARATOR '||MEDIA||'
+                ) as MediaData
+            FROM Posts p
+            JOIN Users u ON p.UserID = u.UserID  
+            LEFT JOIN PostMedia pm ON p.PostID = pm.PostID
+            GROUP BY p.PostID, p.UserID, p.PostType, p.Content, p.CreatedAt, u.UserName, u.Email
+            ORDER BY p.CreatedAt DESC
+        `) as any;
         
         console.log('📊 [POST] Retrieved', posts.length, 'posts from database');
         
-        const processedPosts = posts.map(post => {
-            const postData = post.toJSON();
+        const processedPosts = posts.map((post: any) => {
+            let media: any[] = [];
             
-            if (post.PostType === 'Image' && post.Content.includes('\nImages: ')) {
-                const contentParts = post.Content.split('\nImages: ');
-                const caption = contentParts[0] || '';
-                const imagesPart = contentParts[1];
-                const images = imagesPart ? imagesPart.split(', ').map((img: string) => img.trim()) : [];
-                return {
-                    ...postData,
-                    caption,
-                    images,
-                    hasImages: true
-                };
-            } else {
-                return {
-                    ...postData,
-                    caption: post.Content,
-                    images: [],
-                    hasImages: false
-                };
+            // Parse the media data if it exists
+            if (post.MediaData) {
+                const mediaStrings = post.MediaData.split('||MEDIA||');
+                media = mediaStrings
+                    .filter((mediaStr: string) => mediaStr && mediaStr.trim())
+                    .map((mediaStr: string) => {
+                        try {
+                            return JSON.parse(mediaStr);
+                        } catch (e) {
+                            console.log('❌ Error parsing media:', mediaStr);
+                            return null;
+                        }
+                    })
+                    .filter((mediaItem: any) => mediaItem !== null);
             }
+            
+            // Always use the same format regardless of whether media exists or not
+            return {
+                PostID: post.PostID,
+                UserID: post.UserID,
+                PostType: post.PostType,
+                Content: post.Content,
+                CreatedAt: post.CreatedAt,
+                author: {
+                    UserID: post.UserID,
+                    UserName: post.UserName,
+                    Email: post.Email
+                },
+                content: post.Content,
+                media: media,
+                hasMedia: media.length > 0,
+                mediaCount: media.length
+            };
         });
         
-        console.log('✅ [POST] Successfully processed and returning', processedPosts.length, 'posts');
+        console.log('✅ [POST] Successfully processed and returning', processedPosts.length, 'posts with media');
         res.status(200).json(processedPosts);
     } catch (err: any) {
         console.log('❌ [POST] Database error:', err.message);
@@ -153,22 +211,128 @@ export async function getPostsByUser(req: Request, res: Response) {
     }
     
     try {
-        console.log('💾 [POST] Fetching posts for UserID:', UserID);
-        const posts = await Post.findAll({
-            where: { UserID },
-            include: [
-                {
-                    model: User,
-                    as: 'author',
-                    attributes: ['UserID', 'UserName', 'Email']
-                }
-            ],
-            order: [['CreatedAt', 'DESC']]
-        });
+        console.log('💾 [POST] Fetching posts for UserID:', UserID, 'with media using raw SQL...');
+        
+        // Use raw SQL query to ensure we get the media data (same as getAllPosts but filtered by UserID)
+        const [posts] = await sequelize.query(`
+            SELECT 
+                p.PostID,
+                p.UserID,
+                p.PostType,
+                p.Content,
+                p.CreatedAt,
+                u.UserName,
+                u.Email,
+                GROUP_CONCAT(
+                    CASE WHEN pm.MediaID IS NOT NULL 
+                    THEN JSON_OBJECT(
+                        'mediaId', pm.MediaID,
+                        'type', pm.MediaType,
+                        'url', pm.MediaURL,
+                        'order', pm.MediaOrder
+                    ) END
+                    ORDER BY pm.MediaOrder
+                    SEPARATOR '||MEDIA||'
+                ) as MediaData
+            FROM Posts p
+            JOIN Users u ON p.UserID = u.UserID  
+            LEFT JOIN PostMedia pm ON p.PostID = pm.PostID
+            WHERE p.UserID = ?
+            GROUP BY p.PostID, p.UserID, p.PostType, p.Content, p.CreatedAt, u.UserName, u.Email
+            ORDER BY p.CreatedAt DESC
+        `, {
+            replacements: [UserID]
+        }) as any;
         
         console.log('📊 [POST] Retrieved', posts.length, 'posts for UserID:', UserID);
-        console.log('✅ [POST] Successfully returning posts for user');
-        res.status(200).json(posts);
+        
+        const processedPosts = posts.map((post: any) => {
+            let media: any[] = [];
+            
+            // Parse the media data if it exists
+            if (post.MediaData) {
+                const mediaStrings = post.MediaData.split('||MEDIA||');
+                media = mediaStrings
+                    .filter((mediaStr: string) => mediaStr && mediaStr.trim())
+                    .map((mediaStr: string) => {
+                        try {
+                            return JSON.parse(mediaStr);
+                        } catch (e) {
+                            console.log('❌ Error parsing media:', mediaStr);
+                            return null;
+                        }
+                    })
+                    .filter((mediaItem: any) => mediaItem !== null);
+            }
+            
+            // Handle posts with the new PostMedia structure
+            if (media.length > 0) {
+                return {
+                    PostID: post.PostID,
+                    UserID: post.UserID,
+                    PostType: post.PostType,
+                    Content: post.Content,
+                    CreatedAt: post.CreatedAt,
+                    author: {
+                        UserID: post.UserID,
+                        UserName: post.UserName,
+                        Email: post.Email
+                    },
+                    content: post.Content,
+                    media: media,
+                    hasMedia: true,
+                    mediaCount: media.length
+                };
+            }
+            // Handle legacy posts with old image format in Content field
+            else if (post.PostType === 'Image' && post.Content.includes('\nImages: ')) {
+                const contentParts = post.Content.split('\nImages: ');
+                const caption = contentParts[0] || '';
+                const imagesPart = contentParts[1];
+                const images = imagesPart ? imagesPart.split(', ').map((img: string) => img.trim()) : [];
+                return {
+                    PostID: post.PostID,
+                    UserID: post.UserID,
+                    PostType: post.PostType,
+                    Content: post.Content,
+                    CreatedAt: post.CreatedAt,
+                    author: {
+                        UserID: post.UserID,
+                        UserName: post.UserName,
+                        Email: post.Email
+                    },
+                    content: caption,
+                    legacyImages: images,
+                    media: [],
+                    hasMedia: false,
+                    hasLegacyImages: true,
+                    mediaCount: images.length
+                };
+            }
+            // Handle text-only posts or posts without media
+            else {
+                return {
+                    PostID: post.PostID,
+                    UserID: post.UserID,
+                    PostType: post.PostType,
+                    Content: post.Content,
+                    CreatedAt: post.CreatedAt,
+                    author: {
+                        UserID: post.UserID,
+                        UserName: post.UserName,
+                        Email: post.Email
+                    },
+                    content: post.Content,
+                    media: [],
+                    hasMedia: false,
+                    hasLegacyImages: false,
+                    mediaCount: 0
+                };
+            }
+        });
+        
+        console.log('✅ [POST] Successfully returning', processedPosts.length, 'posts for user with media');
+        res.status(200).json(processedPosts);
     } catch (err: any) {
         console.log('❌ [POST] Database error:', err.message);
         res.status(500).json({ error: err.message });
