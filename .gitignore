@@ -1,6 +1,6 @@
 node_modules/
 dist/
 .vscode/
-.github/
-.env
 debug_jwt.js
+cookies.txt
+.env
