@@ -29,7 +29,7 @@ app.use((0, cookie_parser_1.default)());
 app.use((req, res, next) => {
     const timestamp = new Date().toISOString();
     console.log(`\n🌐 [${timestamp}] ${req.method} ${req.originalUrl}`);
-    if (req.method !== 'GET' && Object.keys(req.body).length > 0) {
+    if (req.method !== 'GET' && req.body && Object.keys(req.body).length > 0) {
         console.log('📤 Request from:', req.ip);
     }
     next();

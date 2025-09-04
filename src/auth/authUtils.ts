@@ -79,43 +79,62 @@ export const verifyAccessToken = async (token: string): Promise<UserPayload | nu
     }
 };
 
-export const verifyRefreshToken = async (token: string): Promise<UserPayload | null> => {
+export const verifyRefreshToken = async (refreshToken: string): Promise<User | null> => {
     try {
-        console.log('🔐 [AUTH] Verifying refresh token...');
-        const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET as string) as UserPayload;
+        const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET as string) as any;
         
-        console.log('💾 [AUTH] Fetching fresh user data from database for refresh token - UserID:', decoded.UserID);
-        const dbUser = await User.findOne({
-            where: {
-                UserID: decoded.UserID,
-                Email: decoded.Email
-            }
+        // Find the user by ID from the decoded token (using UserID, not userId)
+        const user = await User.findOne({ 
+            where: { 
+                UserID: decoded.UserID
+            } 
         });
-        
-        if (!dbUser) {
-            console.log('❌ [AUTH] User not found in database for refresh token');
+
+        if (!user) {
+            console.log('❌ [REFRESH] User not found for refresh token');
             return null;
         }
+
+        console.log('✅ [REFRESH] Refresh token verified for user:', user.Email);
+        return user;
+    } catch (error) {
+        console.log('❌ [REFRESH] Invalid refresh token:', error);
+        return null;
+    }
+};
+
+// Helper function for automatic token refresh
+export const attemptTokenRefresh = async (refreshToken: string): Promise<{
+    user: User;
+    accessToken: string;
+    refreshToken: string;
+} | null> => {
+    try {
+        console.log('🔄 [REFRESH] Attempting automatic token refresh...');
         
-        if (dbUser.Email !== decoded.Email) {
-            console.log('❌ [AUTH] Refresh token email mismatch with database');
+        const user = await verifyRefreshToken(refreshToken);
+        if (!user) {
+            console.log('❌ [REFRESH] Invalid refresh token for auto-refresh');
             return null;
         }
-        
-        console.log('✅ [AUTH] Refresh token verified against database successfully');
+
+        // Generate new tokens using the existing generateTokens function
+        const newTokens = generateTokens(user);
+
+        console.log('✅ [REFRESH] Tokens automatically refreshed for user:', user.Email);
         return {
-            UserID: dbUser.UserID,
-            Email: dbUser.Email,
-            UserRole: dbUser.UserRole
+            user,
+            accessToken: newTokens.accessToken,
+            refreshToken: newTokens.refreshToken
         };
     } catch (error) {
-        console.log('❌ [AUTH] Refresh token verification failed:', error);
+        console.log('❌ [REFRESH] Auto-refresh failed:', error);
         return null;
     }
 };
 
 export const authenticateToken = async (req: Request, res: Response, next: NextFunction) => {
-    console.log('🔐 [AUTH] Checking authentication...');
+    console.log('🔐 [AUTH] Authenticating token...');
     
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -128,8 +147,40 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
     try {
         const user = await verifyAccessToken(token);
         if (!user) {
-            console.log('❌ [AUTH] Invalid or expired access token');
-            return res.status(403).json({ error: 'Invalid or expired token' });
+            console.log('❌ [AUTH] Invalid or expired access token - checking for refresh token');
+            
+            // Check if there's a refresh token in headers or cookies
+            const refreshToken = req.headers['x-refresh-token'] as string || req.cookies?.refreshToken;
+            
+            if (!refreshToken) {
+                console.log('❌ [AUTH] No refresh token available for automatic refresh');
+                return res.status(401).json({ 
+                    error: 'Token expired and no refresh token provided',
+                    tokenExpired: true 
+                });
+            }
+
+            try {
+                // Try to refresh the token automatically
+                const refreshResult = await attemptTokenRefresh(refreshToken);
+                if (refreshResult) {
+                    console.log('✅ [AUTH] Token automatically refreshed');
+                    (req as any).user = refreshResult.user;
+                    // Add new tokens to response headers for client to update
+                    res.set('X-New-Access-Token', refreshResult.accessToken);
+                    res.set('X-New-Refresh-Token', refreshResult.refreshToken);
+                    next();
+                    return;
+                }
+            } catch (refreshError) {
+                console.log('❌ [AUTH] Automatic token refresh failed:', refreshError);
+            }
+
+            return res.status(403).json({ 
+                error: 'Token expired and refresh failed',
+                tokenExpired: true,
+                requiresReauth: true
+            });
         }
 
         console.log('✅ [AUTH] User authenticated:', user.Email, 'Role:', user.UserRole);

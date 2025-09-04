@@ -19,7 +19,7 @@ app.use(cookieParser());
 app.use((req, res, next) => {
     const timestamp = new Date().toISOString();
     console.log(`\n🌐 [${timestamp}] ${req.method} ${req.originalUrl}`);
-    if (req.method !== 'GET' && Object.keys(req.body).length > 0) {
+    if (req.method !== 'GET' && req.body && Object.keys(req.body).length > 0) {
         console.log('📤 Request from:', req.ip);
     }
     next();
@@ -38,7 +38,7 @@ async function startServer() {
             console.error('❌ Failed to initialize database. Exiting...');
             process.exit(1);
         }
-        
+
         app.listen(port, () => {
             console.log('🚀 LinkedIn API Server Started with Sequelize!');
             console.log(`📍 Server running at http://localhost:${port}`);

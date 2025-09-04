@@ -151,10 +151,11 @@ export async function loginUser(req: Request, res: Response) {
 export async function refreshToken(req: Request, res: Response) {
     console.log('🔵 [USER] POST /api/users/refresh - Refreshing access token');
     
-    const { refreshToken } = req.cookies;
+    // Check both cookies and headers for refresh token
+    const refreshToken = req.cookies.refreshToken || req.headers['x-refresh-token'] as string;
     
     if (!refreshToken) {
-        console.log('❌ [USER] No refresh token found in cookies');
+        console.log('❌ [USER] No refresh token found in cookies or X-Refresh-Token header');
         res.status(401).json({ error: 'Refresh token required' });
         return;
     }

@@ -154,9 +154,10 @@ function loginUser(req, res) {
 function refreshToken(req, res) {
     return __awaiter(this, void 0, void 0, function* () {
         console.log('🔵 [USER] POST /api/users/refresh - Refreshing access token');
-        const { refreshToken } = req.cookies;
+        // Check both cookies and headers for refresh token
+        const refreshToken = req.cookies.refreshToken || req.headers['x-refresh-token'];
         if (!refreshToken) {
-            console.log('❌ [USER] No refresh token found in cookies');
+            console.log('❌ [USER] No refresh token found in cookies or X-Refresh-Token header');
             res.status(401).json({ error: 'Refresh token required' });
             return;
         }
