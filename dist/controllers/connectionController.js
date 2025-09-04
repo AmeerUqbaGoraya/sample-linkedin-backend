@@ -16,6 +16,7 @@ exports.addConnection = addConnection;
 exports.updateConnectionStatus = updateConnectionStatus;
 exports.getUserConnections = getUserConnections;
 exports.getUserConnectionRequests = getUserConnectionRequests;
+exports.getUserPendingRequests = getUserPendingRequests;
 const Connection_1 = __importDefault(require("../models/Connection"));
 const sequelize_1 = require("sequelize");
 function addConnection(req, res) {
@@ -166,6 +167,51 @@ function getUserConnectionRequests(req, res) {
                     pendingReceived: receivedRequests.filter(req => req.Status === 'Pending').length,
                     acceptedSent: sentRequests.filter(req => req.Status === 'Accepted').length,
                     acceptedReceived: receivedRequests.filter(req => req.Status === 'Accepted').length
+                }
+            });
+        }
+        catch (err) {
+            console.log('❌ [CONNECTION] Database error:', err.message);
+            res.status(500).json({ error: err.message });
+        }
+    });
+}
+function getUserPendingRequests(req, res) {
+    return __awaiter(this, void 0, void 0, function* () {
+        console.log('🔵 [CONNECTION] GET /api/connections/pending - Fetching pending connection requests only');
+        const user = req.user; // From authenticateToken middleware
+        if (!user || !user.UserID) {
+            console.log('❌ [CONNECTION] Authentication failed - User not found in request');
+            res.status(401).json({ error: 'Authentication required' });
+            return;
+        }
+        try {
+            console.log('💾 [CONNECTION] Fetching pending requests for UserID:', user.UserID);
+            // Get pending requests sent by user
+            const pendingSentRequests = yield Connection_1.default.findAll({
+                where: {
+                    UserID: user.UserID,
+                    Status: 'Pending'
+                },
+                order: [['CreatedAt', 'DESC']]
+            });
+            // Get pending requests received by user
+            const pendingReceivedRequests = yield Connection_1.default.findAll({
+                where: {
+                    RecipientID: user.UserID,
+                    Status: 'Pending'
+                },
+                order: [['CreatedAt', 'DESC']]
+            });
+            console.log('📊 [CONNECTION] Retrieved', pendingSentRequests.length, 'pending sent and', pendingReceivedRequests.length, 'pending received');
+            console.log('✅ [CONNECTION] Successfully returning pending requests');
+            res.status(200).json({
+                pendingSentRequests: pendingSentRequests,
+                pendingReceivedRequests: pendingReceivedRequests,
+                summary: {
+                    totalPendingSent: pendingSentRequests.length,
+                    totalPendingReceived: pendingReceivedRequests.length,
+                    actionRequired: pendingReceivedRequests.length // Requests waiting for user's response
                 }
             });
         }

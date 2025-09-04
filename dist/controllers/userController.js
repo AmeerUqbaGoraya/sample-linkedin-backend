@@ -136,6 +136,7 @@ function loginUser(req, res) {
             res.status(200).json({
                 message: 'Login successful',
                 accessToken: tokens.accessToken,
+                refreshToken: tokens.refreshToken, // Added for visibility during testing
                 user: {
                     UserID: user.UserID,
                     UserName: user.UserName,
@@ -183,6 +184,7 @@ function refreshToken(req, res) {
             res.status(200).json({
                 message: 'Token refreshed successfully',
                 accessToken: tokens.accessToken,
+                refreshToken: tokens.refreshToken, // Added for visibility during testing
                 user: {
                     UserID: decoded.UserID,
                     UserName: decoded.Email.split('@')[0],

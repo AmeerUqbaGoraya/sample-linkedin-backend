@@ -175,3 +175,53 @@ export async function getUserConnectionRequests(req: Request, res: Response) {
         res.status(500).json({ error: err.message });
     }
 }
+
+export async function getUserPendingRequests(req: Request, res: Response) {
+    console.log('🔵 [CONNECTION] GET /api/connections/pending - Fetching pending connection requests only');
+    
+    const user = (req as any).user; // From authenticateToken middleware
+    
+    if (!user || !user.UserID) {
+        console.log('❌ [CONNECTION] Authentication failed - User not found in request');
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+    }
+    
+    try {
+        console.log('💾 [CONNECTION] Fetching pending requests for UserID:', user.UserID);
+        
+        // Get pending requests sent by user
+        const pendingSentRequests = await Connection.findAll({
+            where: {
+                UserID: user.UserID,
+                Status: 'Pending'
+            },
+            order: [['CreatedAt', 'DESC']]
+        });
+        
+        // Get pending requests received by user
+        const pendingReceivedRequests = await Connection.findAll({
+            where: {
+                RecipientID: user.UserID,
+                Status: 'Pending'
+            },
+            order: [['CreatedAt', 'DESC']]
+        });
+        
+        console.log('📊 [CONNECTION] Retrieved', pendingSentRequests.length, 'pending sent and', pendingReceivedRequests.length, 'pending received');
+        console.log('✅ [CONNECTION] Successfully returning pending requests');
+        
+        res.status(200).json({
+            pendingSentRequests: pendingSentRequests,
+            pendingReceivedRequests: pendingReceivedRequests,
+            summary: {
+                totalPendingSent: pendingSentRequests.length,
+                totalPendingReceived: pendingReceivedRequests.length,
+                actionRequired: pendingReceivedRequests.length // Requests waiting for user's response
+            }
+        });
+    } catch (err: any) {
+        console.log('❌ [CONNECTION] Database error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+}
