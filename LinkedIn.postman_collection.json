@@ -401,6 +401,44 @@
 						}
 					},
 					"response": []
+				},
+				{
+					"name": "Crea",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"PostType\": \"Mixed\",\n  \"Content\": \"🚀 Complete project showcase! From planning to deployment - here's our entire journey with screenshots and demo videos. Amazing team collaboration! #ProjectSuccess #Development #TeamWork\",\n  \"MediaURLs\": [\n    {\n      \"url\": \"https://example.com/project/planning-phase.jpg\",\n      \"type\": \"Image\"\n    },\n    {\n      \"url\": \"https://example.com/project/development-demo.mp4\",\n      \"type\": \"Video\"\n    },\n    {\n      \"url\": \"https://example.com/project/testing-results.jpg\",\n      \"type\": \"Image\"\n    },\n    {\n      \"url\": \"https://example.com/project/deployment-video.mp4\",\n      \"type\": \"Video\"\n    },\n    {\n      \"url\": \"https://example.com/project/final-celebration.jpg\",\n      \"type\": \"Image\"\n    }\n  ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseURL}}/api/posts",
+							"host": [
+								"{{baseURL}}"
+							],
+							"path": [
+								"api",
+								"posts"
+							]
+						}
+					},
+					"response": []
 				}
 			]
 		},
