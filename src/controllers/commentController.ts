@@ -107,3 +107,79 @@ export async function getAllComments(req: Request, res: Response) {
         res.status(500).json({ error: err.message });
     }
 }
+
+export async function deleteComment(req: Request, res: Response) {
+    console.log('🔵 [COMMENT] DELETE /api/comments/:id - Deleting comment');
+    console.log('📝 Request params:', req.params);
+    
+    const { id } = req.params;
+    const user = (req as any).user; // From authenticateToken middleware
+    
+    if (!id) {
+        console.log('❌ [COMMENT] Validation failed - Missing comment ID');
+        res.status(400).json({ error: 'Comment ID is required' });
+        return;
+    }
+    
+    if (!user || !user.UserID) {
+        console.log('❌ [COMMENT] Authentication failed - User not found in request');
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+    }
+    
+    try {
+        const commentId = parseInt(id);
+        if (isNaN(commentId)) {
+            console.log('❌ [COMMENT] Invalid comment ID format:', id);
+            res.status(400).json({ error: 'Invalid comment ID format' });
+            return;
+        }
+        
+        console.log('🔍 [COMMENT] Finding comment with ID:', commentId, 'for UserID:', user.UserID);
+        
+        // First check if comment exists
+        const comment = await Comment.findOne({
+            where: { CommentID: commentId }
+        });
+        
+        if (!comment) {
+            console.log('❌ [COMMENT] Comment not found with ID:', commentId);
+            res.status(404).json({ error: 'Comment not found' });
+            return;
+        }
+        
+        // Check if user owns this comment or is admin
+        if (comment.UserID !== user.UserID && user.UserRole !== 'Admin') {
+            console.log('❌ [COMMENT] User does not have permission to delete comment. Comment UserID:', comment.UserID, 'Request UserID:', user.UserID, 'User Role:', user.UserRole);
+            res.status(403).json({ error: 'You can only delete your own comments' });
+            return;
+        }
+        
+        console.log('🗑️ [COMMENT] Deleting comment and all replies (CASCADE)');
+        
+        // Delete the comment - database CASCADE will handle all replies automatically
+        const deletedRows = await Comment.destroy({
+            where: { CommentID: commentId }
+        });
+        
+        if (deletedRows === 0) {
+            console.log('❌ [COMMENT] Failed to delete comment');
+            res.status(500).json({ error: 'Failed to delete comment' });
+            return;
+        }
+        
+        const isAdminDeletion = comment.UserID !== user.UserID && user.UserRole === 'Admin';
+        console.log('✅ [COMMENT] Comment deleted successfully. CommentID:', commentId, 'by UserID:', user.UserID, isAdminDeletion ? '(Admin deletion)' : '(Owner deletion)');
+        
+        res.status(200).json({ 
+            message: 'Comment deleted successfully',
+            deletedCommentID: commentId,
+            deletedBy: isAdminDeletion ? 'Admin' : 'Owner',
+            originalCommentOwner: comment.UserID
+        });
+        
+    } catch (error) {
+        console.error('💥 [COMMENT] Error deleting comment:', error);
+        res.status(500).json({ error: 'Internal server error while deleting comment' });
+    }
+}

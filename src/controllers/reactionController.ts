@@ -7,7 +7,7 @@ export async function addReaction(req: Request, res: Response) {
     console.log('📝 Request body:', JSON.stringify(req.body, null, 2));
     
     const { PostID, ReactionID } = req.body;
-    const user = (req as any).user; // From authenticateToken middleware
+    const user = (req as any).user;
     
     if (!PostID || !ReactionID) {
         console.log('❌ [REACTION] Validation failed - Missing required fields');
@@ -48,8 +48,8 @@ export async function removeReaction(req: Request, res: Response) {
     console.log('📝 Request body:', JSON.stringify(req.body, null, 2));
     
     const { PostID } = req.body;
-    const user = (req as any).user; // From authenticateToken middleware
-    
+    const user = (req as any).user;
+
     if (!PostID) {
         console.log('❌ [REACTION] Validation failed - Missing required fields');
         res.status(400).json({ error: 'Missing required fields: PostID' });
@@ -83,6 +83,92 @@ export async function removeReaction(req: Request, res: Response) {
     } catch (err: any) {
         console.log('❌ [REACTION] Database error:', err.message);
         res.status(500).json({ error: err.message });
+    }
+}
+
+export async function deleteReaction(req: Request, res: Response) {
+    console.log('🔵 [REACTION] DELETE /api/reactions/:postId/:userId - Admin delete specific reaction');
+    console.log('📝 Request params:', req.params);
+    
+    const { postId, userId } = req.params;
+    const user = (req as any).user;
+    
+    if (!postId || !userId) {
+        console.log('❌ [REACTION] Validation failed - Missing required parameters');
+        res.status(400).json({ error: 'PostID and UserID are required' });
+        return;
+    }
+    
+    if (!user || !user.UserID) {
+        console.log('❌ [REACTION] Authentication failed - User not found in request');
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+    }
+    
+    // Only admins can delete other users' reactions
+    if (user.UserRole !== 'Admin' && parseInt(userId) !== user.UserID) {
+        console.log('❌ [REACTION] User does not have permission to delete this reaction. Target UserID:', userId, 'Request UserID:', user.UserID, 'User Role:', user.UserRole);
+        res.status(403).json({ error: 'Only admins can delete other users\' reactions' });
+        return;
+    }
+    
+    try {
+        const targetPostId = parseInt(postId);
+        const targetUserId = parseInt(userId);
+        
+        if (isNaN(targetPostId) || isNaN(targetUserId)) {
+            console.log('❌ [REACTION] Invalid ID format - PostID:', postId, 'UserID:', userId);
+            res.status(400).json({ error: 'Invalid PostID or UserID format' });
+            return;
+        }
+        
+        console.log('🔍 [REACTION] Finding reaction - PostID:', targetPostId, 'UserID:', targetUserId);
+        
+        // Check if reaction exists
+        const reaction = await PostReaction.findOne({
+            where: { 
+                PostID: targetPostId,
+                UserID: targetUserId 
+            }
+        });
+        
+        if (!reaction) {
+            console.log('❌ [REACTION] Reaction not found');
+            res.status(404).json({ error: 'Reaction not found' });
+            return;
+        }
+        
+        console.log('🗑️ [REACTION] Deleting reaction - PostID:', targetPostId, 'UserID:', targetUserId);
+        
+        const deletedCount = await PostReaction.destroy({
+            where: {
+                PostID: targetPostId,
+                UserID: targetUserId
+            }
+        });
+        
+        if (deletedCount === 0) {
+            console.log('❌ [REACTION] Failed to delete reaction');
+            res.status(500).json({ error: 'Failed to delete reaction' });
+            return;
+        }
+        
+        const isAdminDeletion = user.UserID !== targetUserId && user.UserRole === 'Admin';
+        console.log('✅ [REACTION] Reaction deleted successfully. PostID:', targetPostId, 'UserID:', targetUserId, 'by:', user.UserID, isAdminDeletion ? '(Admin deletion)' : '(Owner deletion)');
+        
+        res.status(200).json({ 
+            message: 'Reaction deleted successfully',
+            deletedReaction: {
+                PostID: targetPostId,
+                UserID: targetUserId
+            },
+            deletedBy: isAdminDeletion ? 'Admin' : 'Owner',
+            originalReactionOwner: targetUserId
+        });
+        
+    } catch (error) {
+        console.error('💥 [REACTION] Error deleting reaction:', error);
+        res.status(500).json({ error: 'Internal server error while deleting reaction' });
     }
 }
 

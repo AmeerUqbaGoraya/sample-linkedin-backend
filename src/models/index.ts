@@ -7,7 +7,7 @@ import Reaction from './Reaction';
 import PostReaction from './PostReaction';
 import PostMedia from './PostMedia';
 
-// Import all models to ensure associations are set up
+
 const models = {
     User,
     Post,
@@ -25,10 +25,9 @@ export const initializeDatabase = async () => {
         console.log('✅ [DB] Database connection established successfully');
         
         console.log('🔧 [DB] Synchronizing database models...');
-        await sequelize.sync({ alter: false }); // Set to true if you want to alter existing tables
+        await sequelize.sync({ alter: false });
         console.log('✅ [DB] Database models synchronized successfully');
         
-        // Initialize default reactions if they don't exist
         await initializeReactions();
         
         return true;

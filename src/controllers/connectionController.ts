@@ -26,7 +26,7 @@ export async function addConnection(req: Request, res: Response) {
         const newConnection = await Connection.create({
             UserID: user.UserID,
             RecipientID,
-            Status: 'Pending' // Default to Pending for new connections
+            Status: 'Pending'
         });
         
         console.log('✅ [CONNECTION] Connection created successfully');
@@ -46,7 +46,7 @@ export async function updateConnectionStatus(req: Request, res: Response) {
     console.log('📝 Request body:', JSON.stringify(req.body, null, 2));
     
     const { RequesterUserID, Status } = req.body;
-    const user = (req as any).user; // From authenticateToken middleware (this is the recipient)
+    const user = (req as any).user; 
     
     if (!RequesterUserID || !Status) {
         console.log('❌ [CONNECTION] Validation failed - Missing required fields');
@@ -90,7 +90,7 @@ export async function updateConnectionStatus(req: Request, res: Response) {
 export async function getUserConnections(req: Request, res: Response) {
     console.log('🔵 [CONNECTION] GET /api/connections - Fetching user connections');
     
-    const user = (req as any).user; // From authenticateToken middleware
+    const user = (req as any).user;
     
     if (!user || !user.UserID) {
         console.log('❌ [CONNECTION] Authentication failed - User not found in request');
@@ -133,7 +133,7 @@ export async function getUserConnectionRequests(req: Request, res: Response) {
     try {
         console.log('💾 [CONNECTION] Fetching connection requests for UserID:', user.UserID);
         
-        // Get requests sent by user (excluding rejected)
+        
         const sentRequests = await Connection.findAll({
             where: {
                 UserID: user.UserID,
@@ -144,7 +144,7 @@ export async function getUserConnectionRequests(req: Request, res: Response) {
             order: [['CreatedAt', 'DESC']]
         });
         
-        // Get requests received by user (excluding rejected)
+        
         const receivedRequests = await Connection.findAll({
             where: {
                 RecipientID: user.UserID,
@@ -179,7 +179,7 @@ export async function getUserConnectionRequests(req: Request, res: Response) {
 export async function getUserPendingRequests(req: Request, res: Response) {
     console.log('🔵 [CONNECTION] GET /api/connections/pending - Fetching pending connection requests only');
     
-    const user = (req as any).user; // From authenticateToken middleware
+    const user = (req as any).user;
     
     if (!user || !user.UserID) {
         console.log('❌ [CONNECTION] Authentication failed - User not found in request');
@@ -190,7 +190,6 @@ export async function getUserPendingRequests(req: Request, res: Response) {
     try {
         console.log('💾 [CONNECTION] Fetching pending requests for UserID:', user.UserID);
         
-        // Get pending requests sent by user
         const pendingSentRequests = await Connection.findAll({
             where: {
                 UserID: user.UserID,
@@ -198,8 +197,7 @@ export async function getUserPendingRequests(req: Request, res: Response) {
             },
             order: [['CreatedAt', 'DESC']]
         });
-        
-        // Get pending requests received by user
+
         const pendingReceivedRequests = await Connection.findAll({
             where: {
                 RecipientID: user.UserID,
@@ -217,7 +215,7 @@ export async function getUserPendingRequests(req: Request, res: Response) {
             summary: {
                 totalPendingSent: pendingSentRequests.length,
                 totalPendingReceived: pendingReceivedRequests.length,
-                actionRequired: pendingReceivedRequests.length // Requests waiting for user's response
+                actionRequired: pendingReceivedRequests.length 
             }
         });
     } catch (err: any) {

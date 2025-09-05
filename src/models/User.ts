@@ -54,7 +54,7 @@ User.init(
     {
         sequelize,
         tableName: 'Users',
-        timestamps: false, // We're handling CreatedAt manually
+        timestamps: false,
     }
 );
 

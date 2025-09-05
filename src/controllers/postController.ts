@@ -9,7 +9,7 @@ export async function createPost(req: Request, res: Response) {
     console.log('📝 Request body:', JSON.stringify(req.body, null, 2));
     
     const { PostType, Content, MediaURLs } = req.body;
-    const user = (req as any).user; // From authenticateToken middleware
+    const user = (req as any).user; 
     
     if (!PostType || (!Content && !MediaURLs)) {
         console.log('❌ [POST] Validation failed - Missing required fields');
@@ -26,7 +26,6 @@ export async function createPost(req: Request, res: Response) {
     try {
         console.log('💾 [POST] Creating post with Sequelize for PostType:', PostType);
         
-        // Determine the actual PostType based on content
         let actualPostType = PostType;
         if (Content && MediaURLs && MediaURLs.length > 0) {
             actualPostType = 'Mixed';
@@ -38,7 +37,6 @@ export async function createPost(req: Request, res: Response) {
             Content: Content || ''
         });
         
-        // If there are media URLs, create PostMedia entries
         if (MediaURLs && Array.isArray(MediaURLs) && MediaURLs.length > 0) {
             console.log('💾 [POST] Creating media entries for post:', newPost.PostID);
             const mediaPromises = MediaURLs.map((media: any, index: number) => {
@@ -72,8 +70,7 @@ export async function getAllPosts(req: Request, res: Response) {
     
     try {
         console.log('💾 [POST] Fetching all posts with user info and media using raw SQL...');
-        
-        // Use raw SQL query to ensure we get the media data
+
         const [posts] = await sequelize.query(`
             SELECT 
                 p.PostID,
@@ -105,8 +102,7 @@ export async function getAllPosts(req: Request, res: Response) {
         
         const processedPosts = posts.map((post: any) => {
             let media: any[] = [];
-            
-            // Parse the media data if it exists
+
             if (post.MediaData) {
                 const mediaStrings = post.MediaData.split('||MEDIA||');
                 media = mediaStrings
@@ -122,7 +118,6 @@ export async function getAllPosts(req: Request, res: Response) {
                     .filter((mediaItem: any) => mediaItem !== null);
             }
             
-            // Always use the same format regardless of whether media exists or not
             return {
                 PostID: post.PostID,
                 UserID: post.UserID,
@@ -213,7 +208,6 @@ export async function getPostsByUser(req: Request, res: Response) {
     try {
         console.log('💾 [POST] Fetching posts for UserID:', UserID, 'with media using raw SQL...');
         
-        // Use raw SQL query to ensure we get the media data (same as getAllPosts but filtered by UserID)
         const [posts] = await sequelize.query(`
             SELECT 
                 p.PostID,
@@ -249,7 +243,6 @@ export async function getPostsByUser(req: Request, res: Response) {
         const processedPosts = posts.map((post: any) => {
             let media: any[] = [];
             
-            // Parse the media data if it exists
             if (post.MediaData) {
                 const mediaStrings = post.MediaData.split('||MEDIA||');
                 media = mediaStrings
@@ -265,7 +258,6 @@ export async function getPostsByUser(req: Request, res: Response) {
                     .filter((mediaItem: any) => mediaItem !== null);
             }
             
-            // Handle posts with the new PostMedia structure
             if (media.length > 0) {
                 return {
                     PostID: post.PostID,
@@ -284,7 +276,7 @@ export async function getPostsByUser(req: Request, res: Response) {
                     mediaCount: media.length
                 };
             }
-            // Handle legacy posts with old image format in Content field
+
             else if (post.PostType === 'Image' && post.Content.includes('\nImages: ')) {
                 const contentParts = post.Content.split('\nImages: ');
                 const caption = contentParts[0] || '';
@@ -309,7 +301,6 @@ export async function getPostsByUser(req: Request, res: Response) {
                     mediaCount: images.length
                 };
             }
-            // Handle text-only posts or posts without media
             else {
                 return {
                     PostID: post.PostID,
@@ -336,5 +327,88 @@ export async function getPostsByUser(req: Request, res: Response) {
     } catch (err: any) {
         console.log('❌ [POST] Database error:', err.message);
         res.status(500).json({ error: err.message });
+    }
+}
+
+export async function deletePost(req: Request, res: Response) {
+    console.log('🔵 [POST] DELETE /api/posts/:id - Deleting post');
+    console.log('📝 Request params:', req.params);
+    
+    const { id } = req.params;
+    const user = (req as any).user; 
+    
+    if (!id) {
+        console.log('❌ [POST] Validation failed - Missing post ID');
+        res.status(400).json({ error: 'Post ID is required' });
+        return;
+    }
+    
+    if (!user || !user.UserID) {
+        console.log('❌ [POST] Authentication failed - User not found in request');
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+    }
+    
+    try {
+        const postId = parseInt(id);
+        if (isNaN(postId)) {
+            console.log('❌ [POST] Invalid post ID format:', id);
+            res.status(400).json({ error: 'Invalid post ID format' });
+            return;
+        }
+        
+        console.log('🔍 [POST] Finding post with ID:', postId, 'for UserID:', user.UserID);
+
+        const post = await Post.findOne({
+            where: { PostID: postId }
+        });
+        
+        if (!post) {
+            console.log('❌ [POST] Post not found with ID:', postId);
+            res.status(404).json({ error: 'Post not found' });
+            return;
+        }
+        
+        if (post.UserID !== user.UserID && user.UserRole !== 'Admin') {
+            console.log('❌ [POST] User does not have permission to delete post. Post UserID:', post.UserID, 'Request UserID:', user.UserID, 'User Role:', user.UserRole);
+            res.status(403).json({ error: 'You can only delete your own posts' });
+            return;
+        }
+        
+        console.log('🗑️ [POST] Deleting post and all associated data (media, comments, reactions) for PostID:', postId);
+        console.log('️ [POST] Deleting associated media for post (media will be deleted, comments/reactions preserved):', postId);
+        
+
+        await PostMedia.destroy({
+            where: { PostID: postId }
+        });
+        
+        console.log('💾 [POST] Deleting post - comments and reactions will be preserved with NULL PostID');
+        
+        const deletedRows = await Post.destroy({
+            where: { PostID: postId }
+        });
+        
+        if (deletedRows === 0) {
+            console.log('❌ [POST] Failed to delete post');
+            res.status(500).json({ error: 'Failed to delete post' });
+            return;
+        }
+        
+        const isAdminDeletion = post.UserID !== user.UserID && user.UserRole === 'Admin';
+        console.log('✅ [POST] Post deleted successfully. PostID:', postId, 'by UserID:', user.UserID, isAdminDeletion ? '(Admin deletion)' : '(Owner deletion)');
+        console.log('📝 [POST] Comments and reactions preserved with PostID set to NULL for historical records');
+        
+        res.status(200).json({ 
+            message: 'Post deleted successfully - comments and reactions preserved',
+            deletedPostID: postId,
+            deletedBy: isAdminDeletion ? 'Admin' : 'Owner',
+            originalPostOwner: post.UserID,
+            note: 'Comments and reactions preserved for historical records (PostID set to NULL)'
+        });
+        
+    } catch (error) {
+        console.error('💥 [POST] Error deleting post:', error);
+        res.status(500).json({ error: 'Internal server error while deleting post' });
     }
 }

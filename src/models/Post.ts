@@ -55,10 +55,10 @@ Post.init(
     }
 );
 
-// Import PostMedia after Post is defined to avoid circular dependency
+
 import PostMedia from './PostMedia';
 
-// Define associations
+
 Post.belongsTo(User, { foreignKey: 'UserID', as: 'author' });
 User.hasMany(Post, { foreignKey: 'UserID', as: 'posts' });
 

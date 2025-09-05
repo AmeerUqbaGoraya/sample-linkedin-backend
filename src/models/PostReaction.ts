@@ -60,7 +60,7 @@ PostReaction.init(
     }
 );
 
-// Define associations
+
 PostReaction.belongsTo(User, { foreignKey: 'UserID', as: 'user' });
 PostReaction.belongsTo(Post, { foreignKey: 'PostID', as: 'post' });
 PostReaction.belongsTo(Reaction, { foreignKey: 'ReactionID', as: 'reaction' });

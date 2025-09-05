@@ -1,10 +1,12 @@
 import { Router } from 'express';
-import { addReaction, removeReaction, getReactionTypes } from '../controllers/reactionController';
+import { addReaction, removeReaction, deleteReaction, getReactionTypes } from '../controllers/reactionController';
 import { authenticateToken } from '../auth/authUtils';
 
 const router = Router();
 
 router.post('/reactions', authenticateToken, addReaction);
 router.delete('/reactions', authenticateToken, removeReaction);
+router.delete('/reactions/:postId/:userId', authenticateToken, deleteReaction);
 router.get('/reactions', getReactionTypes);
+
 export default router;

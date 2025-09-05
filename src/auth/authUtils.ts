@@ -83,7 +83,6 @@ export const verifyRefreshToken = async (refreshToken: string): Promise<User | n
     try {
         const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET as string) as any;
         
-        // Find the user by ID from the decoded token (using UserID, not userId)
         const user = await User.findOne({ 
             where: { 
                 UserID: decoded.UserID
@@ -103,7 +102,7 @@ export const verifyRefreshToken = async (refreshToken: string): Promise<User | n
     }
 };
 
-// Helper function for automatic token refresh
+
 export const attemptTokenRefresh = async (refreshToken: string): Promise<{
     user: User;
     accessToken: string;
@@ -149,7 +148,6 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
         if (!user) {
             console.log('❌ [AUTH] Invalid or expired access token - checking for refresh token');
             
-            // Check if there's a refresh token in headers or cookies
             const refreshToken = req.headers['x-refresh-token'] as string || req.cookies?.refreshToken;
             
             if (!refreshToken) {
@@ -161,12 +159,10 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
             }
 
             try {
-                // Try to refresh the token automatically
                 const refreshResult = await attemptTokenRefresh(refreshToken);
                 if (refreshResult) {
                     console.log('✅ [AUTH] Token automatically refreshed');
                     (req as any).user = refreshResult.user;
-                    // Add new tokens to response headers for client to update
                     res.set('X-New-Access-Token', refreshResult.accessToken);
                     res.set('X-New-Refresh-Token', refreshResult.refreshToken);
                     next();

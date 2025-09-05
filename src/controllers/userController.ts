@@ -131,7 +131,7 @@ export async function loginUser(req: Request, res: Response) {
         res.status(200).json({
             message: 'Login successful',
             accessToken: tokens.accessToken,
-            refreshToken: tokens.refreshToken, // Added for visibility during testing
+            refreshToken: tokens.refreshToken,
             user: {
                 UserID: user.UserID,
                 UserName: user.UserName,
@@ -147,8 +147,7 @@ export async function loginUser(req: Request, res: Response) {
 
 export async function refreshToken(req: Request, res: Response) {
     console.log('🔵 [USER] POST /api/users/refresh - Refreshing access token');
-    
-    // Check both cookies and headers for refresh token
+
     const refreshToken = req.cookies.refreshToken || req.headers['x-refresh-token'] as string;
     
     if (!refreshToken) {
@@ -204,4 +203,183 @@ export async function logoutUser(req: Request, res: Response) {
     
     console.log('✅ [USER] User logged out - refresh token cleared');
     res.status(200).json({ message: 'Logged out successfully' });
+}
+
+export async function updateUserName(req: Request, res: Response) {
+    console.log('🔵 [USER] PUT /api/users/name - Updating username');
+    console.log('📝 Request body:', JSON.stringify(req.body, null, 2));
+    
+    const { UserName } = req.body;
+    const user = (req as any).user;
+    
+    if (!UserName) {
+        console.log('❌ [USER] Validation failed - Missing UserName');
+        res.status(400).json({ error: 'UserName is required' });
+        return;
+    }
+    
+    if (!user || !user.UserID) {
+        console.log('❌ [USER] Authentication failed - User not found in request');
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+    }
+    
+    try {
+        console.log('💾 [USER] Updating username for UserID:', user.UserID);
+        
+        const existingUser = await User.findOne({ where: { UserName } });
+        if (existingUser && existingUser.UserID !== user.UserID) {
+            console.log('❌ [USER] Username already taken:', UserName);
+            res.status(409).json({ error: 'Username already exists' });
+            return;
+        }
+        
+        const [updatedRows] = await User.update(
+            { UserName },
+            { where: { UserID: user.UserID } }
+        );
+        
+        if (updatedRows === 0) {
+            console.log('❌ [USER] User not found for update');
+            res.status(404).json({ error: 'User not found' });
+            return;
+        }
+        
+        console.log('✅ [USER] Username updated successfully for UserID:', user.UserID);
+        res.status(200).json({ 
+            message: 'Username updated successfully',
+            UserName: UserName
+        });
+        
+    } catch (error) {
+        console.error('💥 [USER] Error updating username:', error);
+        res.status(500).json({ error: 'Internal server error while updating username' });
+    }
+}
+
+export async function updateUserEmail(req: Request, res: Response) {
+    console.log('🔵 [USER] PUT /api/users/email - Updating email');
+    console.log('📝 Request body:', JSON.stringify(req.body, null, 2));
+    
+    const { Email } = req.body;
+    const user = (req as any).user;
+    
+    if (!Email) {
+        console.log('❌ [USER] Validation failed - Missing Email');
+        res.status(400).json({ error: 'Email is required' });
+        return;
+    }
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(Email)) {
+        console.log('❌ [USER] Invalid email format:', Email);
+        res.status(400).json({ error: 'Invalid email format' });
+        return;
+    }
+    
+    if (!user || !user.UserID) {
+        console.log('❌ [USER] Authentication failed - User not found in request');
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+    }
+    
+    try {
+        console.log('💾 [USER] Updating email for UserID:', user.UserID);
+        
+        const existingUser = await User.findOne({ where: { Email } });
+        if (existingUser && existingUser.UserID !== user.UserID) {
+            console.log('❌ [USER] Email already taken:', Email);
+            res.status(409).json({ error: 'Email already exists' });
+            return;
+        }
+        
+        const [updatedRows] = await User.update(
+            { Email },
+            { where: { UserID: user.UserID } }
+        );
+        
+        if (updatedRows === 0) {
+            console.log('❌ [USER] User not found for update');
+            res.status(404).json({ error: 'User not found' });
+            return;
+        }
+        
+        console.log('✅ [USER] Email updated successfully for UserID:', user.UserID);
+        res.status(200).json({ 
+            message: 'Email updated successfully',
+            Email: Email
+        });
+        
+    } catch (error) {
+        console.error('💥 [USER] Error updating email:', error);
+        res.status(500).json({ error: 'Internal server error while updating email' });
+    }
+}
+
+export async function updateUserPassword(req: Request, res: Response) {
+    console.log('🔵 [USER] PUT /api/users/password - Updating password');
+    console.log('📝 Request body keys:', Object.keys(req.body));
+    
+    const { CurrentPassword, NewPassword } = req.body;
+    const user = (req as any).user;
+    
+    if (!CurrentPassword || !NewPassword) {
+        console.log('❌ [USER] Validation failed - Missing CurrentPassword or NewPassword');
+        res.status(400).json({ error: 'CurrentPassword and NewPassword are required' });
+        return;
+    }
+    
+    if (NewPassword.length < 6) {
+        console.log('❌ [USER] Validation failed - Password too short');
+        res.status(400).json({ error: 'New password must be at least 6 characters long' });
+        return;
+    }
+    
+    if (!user || !user.UserID) {
+        console.log('❌ [USER] Authentication failed - User not found in request');
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+    }
+    
+    try {
+        console.log('🔍 [USER] Fetching user for password verification, UserID:', user.UserID);
+
+        const currentUser = await User.findByPk(user.UserID);
+        if (!currentUser) {
+            console.log('❌ [USER] User not found in database');
+            res.status(404).json({ error: 'User not found' });
+            return;
+        }
+
+        console.log('🔐 [USER] Verifying current password...');
+        const isCurrentPasswordValid = await bcrypt.compare(CurrentPassword, currentUser.PasswordHash);
+        if (!isCurrentPasswordValid) {
+            console.log('❌ [USER] Current password verification failed');
+            res.status(400).json({ error: 'Current password is incorrect' });
+            return;
+        }
+        
+        console.log('✅ [USER] Current password verified, hashing new password...');
+
+        const saltRounds = 10;
+        const hashedNewPassword = await bcrypt.hash(NewPassword, saltRounds);
+
+        const [updatedRows] = await User.update(
+            { PasswordHash: hashedNewPassword },
+            { where: { UserID: user.UserID } }
+        );
+        
+        if (updatedRows === 0) {
+            console.log('❌ [USER] Failed to update password');
+            res.status(500).json({ error: 'Failed to update password' });
+            return;
+        }
+        
+        console.log('✅ [USER] Password updated successfully for UserID:', user.UserID);
+        res.status(200).json({ message: 'Password updated successfully' });
+        
+    } catch (error) {
+        console.error('💥 [USER] Error updating password:', error);
+        res.status(500).json({ error: 'Internal server error while updating password' });
+    }
 }

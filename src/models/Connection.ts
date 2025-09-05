@@ -54,7 +54,7 @@ Connection.init(
     }
 );
 
-// Define associations
+
 Connection.belongsTo(User, { foreignKey: 'UserID', as: 'requester' });
 Connection.belongsTo(User, { foreignKey: 'RecipientID', as: 'recipient' });
 

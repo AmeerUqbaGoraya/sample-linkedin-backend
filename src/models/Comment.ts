@@ -70,7 +70,6 @@ Comment.init(
     }
 );
 
-// Define associations
 Comment.belongsTo(User, { foreignKey: 'UserID', as: 'author' });
 Comment.belongsTo(Post, { foreignKey: 'PostID', as: 'post' });
 Comment.belongsTo(Comment, { foreignKey: 'ReplyToID', as: 'parentComment' });
