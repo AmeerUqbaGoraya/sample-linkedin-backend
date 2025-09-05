@@ -7,7 +7,7 @@ export async function addConnection(req: Request, res: Response) {
     console.log('📝 Request body:', JSON.stringify(req.body, null, 2));
     
     const { RecipientID } = req.body;
-    const user = (req as any).user; // From authenticateToken middleware
+    const user = (req as any).user; 
     
     if (!RecipientID) {
         console.log('❌ [CONNECTION] Validation failed - Missing required fields');
